@@ -10,6 +10,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.server.ServerWorld;
 import rmc.mixins.tick_manager.TickManager;
 import rmc.mixins.tick_manager.Tickable;
+import rmc.mixins.tick_manager.extend.TileEntityEx;
 
 /**
  * Developed by RMC Team, 2021
@@ -22,7 +23,7 @@ public abstract class WorldMixin {
               at = @At(value = "INVOKE",
                        target = "Lnet/minecraft/tileentity/ITickableTileEntity;tick()V"))
     private void checkTileActivation(ITickableTileEntity tickTile) {
-        if (this.rmc$canTileTick((TileEntity) tickTile)) {
+        if (!((TileEntityEx) tickTile).rmc$isNonTickable() && this.rmc$canTileTick((TileEntity) tickTile)) {
             tickTile.tick();
         }
     }
