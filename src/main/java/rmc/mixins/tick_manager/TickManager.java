@@ -1,5 +1,6 @@
 package rmc.mixins.tick_manager;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -7,20 +8,26 @@ import codechicken.chunkloader.api.IChunkLoaderHandler;
 import codechicken.chunkloader.world.Organiser;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.tileentity.ITickableTileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.server.ChunkHolder;
 import net.minecraft.world.server.ServerWorld;
 import rmc.mixins.tick_manager.extend.ChunkEx;
 import rmc.mixins.tick_manager.extend.ChunkLoaderHandlerEx;
 import rmc.mixins.tick_manager.extend.ServerChunkProviderEx;
+import rmc.mixins.tick_manager.extend.TileEntityEx;
 
 /**
  * Developed by RMC Team, 2021
  */
 public abstract class TickManager {
 
+    public static final List<ITickableTileEntity> PENDING_TILES = new ArrayList<>();
+
     public static void activateAll(ServerWorld world) {
+        PENDING_TILES.clear();
         int until = MinecraftServer.currentTick + 1;
         Collection<Organiser> organisers = ((ChunkLoaderHandlerEx) IChunkLoaderHandler.getCapability(world)).rmc$getPlayerOrganisers().values();
         if (!organisers.isEmpty()) {
@@ -29,9 +36,7 @@ public abstract class TickManager {
                     poses.forEach((pos) -> {
                         ChunkEx chunk = getChunkEx(world, pos.asLong());
                         if (chunk != null) {
-                            chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
-                            chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
-                            chunk.rmc$tickUntil(until);
+                            handleChunk(chunk, until, TickPolicy.PERCENT_100);
                         }
                     });
                 });
@@ -48,14 +53,10 @@ public abstract class TickManager {
                             int absShiftX = Math.abs(shiftX);
                             int absShiftZ = Math.abs(shiftZ);
                             if (absShiftX < radius && absShiftZ < radius) {
-                                chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
-                                chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
-                                chunk.rmc$tickUntil(until);
+                                handleChunk(chunk, until, TickPolicy.PERCENT_100);
                             }
                             else {
-                                chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_50);
-                                chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_50);
-                                chunk.rmc$tickUntil(until);
+                                handleChunk(chunk, until, TickPolicy.PERCENT_50);
                             }
                         }
                     }
@@ -70,7 +71,7 @@ public abstract class TickManager {
             && chunk.rmc$canTick(tickable);
     }
 
-    private static ChunkEx getChunkEx(ServerWorld world, int cX, int cZ) {
+    public static ChunkEx getChunkEx(ServerWorld world, int cX, int cZ) {
         return getChunkEx(world, new ChunkPos(cX, cZ).asLong());
     }
 
@@ -78,6 +79,19 @@ public abstract class TickManager {
         ChunkHolder holder = ((ServerChunkProviderEx) world.getChunkProvider()).rmc$getChunkHolder(cPos);
         if (holder == null) return null;
         return (ChunkEx) holder.getFullChunk();
+    }
+
+    private static void handleChunk(ChunkEx chunk, int until, TickPolicy policy) {
+        chunk.rmc$tickPolicy(until, Tickable.TILE, policy);
+        chunk.rmc$tickPolicy(until, Tickable.ENTITY, policy);
+        chunk.rmc$tickUntil(until);
+        ((Chunk) chunk).getTileEntityMap().values().forEach((tile) -> {
+            if (tile instanceof ITickableTileEntity
+             && !((TileEntityEx) tile).rmc$isNonTickable()
+             && chunk.rmc$canTick(Tickable.TILE)) {
+                PENDING_TILES.add((ITickableTileEntity) tile);
+            }
+        });
     }
 
 }

@@ -1,36 +1,68 @@
 package rmc.mixins.tick_manager.actual;
 
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import java.util.List;
+import java.util.Set;
 
-import net.minecraft.tileentity.ITickableTileEntity;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Shadow;
+
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.server.ServerWorld;
 import rmc.mixins.tick_manager.TickManager;
-import rmc.mixins.tick_manager.Tickable;
-import rmc.mixins.tick_manager.extend.TileEntityEx;
 
 /**
  * Developed by RMC Team, 2021
  */
-@Mixin(value = World.class,
-       priority = 1100)
+@Mixin(value = World.class)
 public abstract class WorldMixin {
 
-    @Redirect(method = "Lnet/minecraft/world/World;tickBlockEntities()V",
-              at = @At(value = "INVOKE",
-                       target = "Lnet/minecraft/tileentity/ITickableTileEntity;tick()V"))
-    private void checkTileActivation(ITickableTileEntity tickTile) {
-        if (!((TileEntityEx) tickTile).rmc$isNonTickable() && this.rmc$canTileTick((TileEntity) tickTile)) {
-            tickTile.tick();
+    @Shadow protected boolean processingLoadedTiles;
+    @Shadow @Final public List<TileEntity> loadedTileEntityList;
+    @Shadow @Final public List<TileEntity> tickableTileEntities;
+    @Shadow @Final protected Set<TileEntity> tileEntitiesToBeRemoved;
+    @Shadow @Final protected List<TileEntity> addedTileEntityList;
+
+    @Overwrite
+    public void tickBlockEntities() {
+        this.loadedTileEntityList.clear();
+        this.tickableTileEntities.clear();
+        this.processingLoadedTiles = true;
+        this.rmc$processRemovedTiles();
+        this.rmc$processTickableTiles();
+        this.processingLoadedTiles = false;
+        this.rmc$processAddedTiles();
+    }
+
+    private void rmc$processRemovedTiles() {
+        if (!this.tileEntitiesToBeRemoved.isEmpty()) {
+            this.tileEntitiesToBeRemoved.forEach((tile) -> tile.onChunkUnloaded());
+            this.tileEntitiesToBeRemoved.clear();
         }
     }
 
-    private boolean rmc$canTileTick(TileEntity tile) {
-        Object hack = this;
-        return TickManager.canTick((ServerWorld) hack, tile.getPos(), Tickable.TILE);
+    private void rmc$processTickableTiles() {
+        if (!TickManager.PENDING_TILES.isEmpty()) {
+            TickManager.PENDING_TILES.forEach((tile) -> tile.tick());
+        }
+    }
+
+    private void rmc$processAddedTiles() {
+        if (!this.addedTileEntityList.isEmpty()) {
+            Object hack = this;
+            this.addedTileEntityList.forEach((tile) -> {
+                BlockPos pos = tile.getPos();
+                Chunk chunk = (Chunk) TickManager.getChunkEx((ServerWorld) hack, pos.getX() >> 4, pos.getZ() >> 4);
+                if (chunk != null) {
+                    chunk.addTileEntity(pos, tile);
+                }
+            });
+            this.addedTileEntityList.clear();
+        }
     }
 
 }
