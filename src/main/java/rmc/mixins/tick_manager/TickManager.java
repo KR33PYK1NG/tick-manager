@@ -1,11 +1,14 @@
 package rmc.mixins.tick_manager;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import com.electronwill.nightconfig.core.file.FileConfig;
 
 import codechicken.chunkloader.api.IChunkLoaderHandler;
 import codechicken.chunkloader.world.Organiser;
@@ -26,6 +29,19 @@ import rmc.mixins.tick_manager.extend.TileEntityEx;
  * Developed by RMC Team, 2021
  */
 public abstract class TickManager {
+
+    private static final int CHUNK_RADIUS;
+
+    static {
+        File cfgfile = new File("mixincfg/tick-manager.toml");
+        cfgfile.getParentFile().mkdir();
+        FileConfig config = FileConfig.of(cfgfile);
+        config.load();
+        config.add("chunk-radius", 1);
+        CHUNK_RADIUS = config.getInt("chunk-radius");
+        config.save();
+        config.close();
+    }
 
     private static final ExecutorService ACTIVATION_EXECUTOR = Executors.newFixedThreadPool(20);
     public static final List<ITickableTileEntity> PENDING_TILES = new ArrayList<>();
@@ -52,15 +68,14 @@ public abstract class TickManager {
         }
         List<ServerPlayerEntity> players = world.getPlayers();
         if (!players.isEmpty()) {
-            int radius = 1;
             players.forEach((player) -> {
-                for (int shiftX = -radius; shiftX <= radius; shiftX++) {
-                    for (int shiftZ = -radius; shiftZ <= radius; shiftZ++) {
+                for (int shiftX = -CHUNK_RADIUS; shiftX <= CHUNK_RADIUS; shiftX++) {
+                    for (int shiftZ = -CHUNK_RADIUS; shiftZ <= CHUNK_RADIUS; shiftZ++) {
                         ChunkEx chunk = getChunkEx(world, player.chunkCoordX + shiftX, player.chunkCoordZ + shiftZ);
                         if (chunk != null) {
                             int absShiftX = Math.abs(shiftX);
                             int absShiftZ = Math.abs(shiftZ);
-                            if (absShiftX < radius && absShiftZ < radius) {
+                            if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
                                 chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
                                 chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
                                 chunk.rmc$tickUntil(until);
