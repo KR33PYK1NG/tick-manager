@@ -30,6 +30,7 @@ import rmc.mixins.tick_manager.extend.TileEntityEx;
 public abstract class TickManager {
 
     private static final int CHUNK_RADIUS;
+    private static final int CHUNK_TICK_RADIUS;
 
     static {
         File cfgfile = new File("mixincfg/tick-manager.toml");
@@ -37,29 +38,37 @@ public abstract class TickManager {
         FileConfig config = FileConfig.of(cfgfile);
         config.load();
         config.add("chunk-radius", 1);
+        config.add("chunk-tick-radius", 7);
         CHUNK_RADIUS = config.getInt("chunk-radius");
+        CHUNK_TICK_RADIUS = config.getInt("chunk-tick-radius");
         config.save();
         config.close();
     }
 
     private static final ExecutorService ACTIVATION_EXECUTOR = Executors.newFixedThreadPool(20);
     public static final List<ITickableTileEntity> PENDING_TILES = new ArrayList<>();
+    public static final List<Chunk> PENDING_CHUNKS = new ArrayList<>();
 
     public static void activateAll(ServerWorld world) {
         PENDING_TILES.clear();
+        PENDING_CHUNKS.clear();
         int until = MinecraftServer.currentTick + 1;
         List<Chunk> chunks = new ArrayList<>();
+        List<Chunk> chunksForTick = new ArrayList<>();
         Collection<Organiser> organisers = ((ChunkLoaderHandlerEx) IChunkLoaderHandler.getCapability(world)).rmc$getPlayerOrganisers().values();
         if (!organisers.isEmpty()) {
             organisers.forEach((organiser) -> {
                 organiser.forcedChunksByLoader.values().forEach((poses) -> {
                     poses.forEach((pos) -> {
-                        ChunkMcAPI.getEntityTickingChunkNow(world, pos.x, pos.z).ifPresent((chunkMc) -> {
-                            ChunkEx chunk = (ChunkEx) chunkMc;
-                            chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_75);
-                            chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_75);
-                            chunk.rmc$tickUntil(until);
-                            if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
+                        ChunkMcAPI.getBorderChunkNow(world, pos.x, pos.z).ifPresent((borderChunk) -> {
+                            if (!chunksForTick.contains(borderChunk)) chunksForTick.add(borderChunk);
+                            ChunkMcAPI.getEntityTickingChunkNow(world, pos.x, pos.z).ifPresent((fullChunk) -> {
+                                ChunkEx chunk = (ChunkEx) fullChunk;
+                                chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_75);
+                                chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_75);
+                                chunk.rmc$tickUntil(until);
+                                if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
+                            });
                         });
                     });
                 });
@@ -68,25 +77,28 @@ public abstract class TickManager {
         List<ServerPlayerEntity> players = world.getPlayers();
         if (!players.isEmpty()) {
             players.forEach((player) -> {
-                for (int shiftX = -CHUNK_RADIUS; shiftX <= CHUNK_RADIUS; shiftX++) {
-                    for (int shiftZ = -CHUNK_RADIUS; shiftZ <= CHUNK_RADIUS; shiftZ++) {
-                        final int finShiftX = shiftX;
-                        final int finShiftZ = shiftZ;
-                        ChunkMcAPI.getEntityTickingChunkNow(world, player.chunkCoordX + finShiftX, player.chunkCoordZ + finShiftZ).ifPresent((chunkMc) -> {
-                            ChunkEx chunk = (ChunkEx) chunkMc;
-                            int absShiftX = Math.abs(finShiftX);
-                            int absShiftZ = Math.abs(finShiftZ);
-                            if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
-                                chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
-                                chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
-                                chunk.rmc$tickUntil(until);
-                                if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
-                            }
-                            else {
-                                chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_50);
-                                chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_50);
-                                chunk.rmc$tickUntil(until);
-                                if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
+                for (int shiftX = -CHUNK_TICK_RADIUS; shiftX <= CHUNK_TICK_RADIUS; shiftX++) {
+                    for (int shiftZ = -CHUNK_TICK_RADIUS; shiftZ <= CHUNK_TICK_RADIUS; shiftZ++) {
+                        int finShiftX = shiftX;
+                        int finShiftZ = shiftZ;
+                        int absShiftX = Math.abs(shiftX);
+                        int absShiftZ = Math.abs(shiftZ);
+                        ChunkMcAPI.getBorderChunkNow(world, player.chunkCoordX + shiftX, player.chunkCoordZ + shiftZ).ifPresent((borderChunk) -> {
+                            if (!chunksForTick.contains(borderChunk)) chunksForTick.add(borderChunk);
+                            if (absShiftX <= CHUNK_RADIUS && absShiftZ <= CHUNK_RADIUS) {
+                                ChunkMcAPI.getEntityTickingChunkNow(world, player.chunkCoordX + finShiftX, player.chunkCoordZ + finShiftZ).ifPresent((fullChunk) -> {
+                                    ChunkEx chunk = (ChunkEx) fullChunk;
+                                    if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
+                                        chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
+                                        chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
+                                    }
+                                    else {
+                                        chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_50);
+                                        chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_50);
+                                    }
+                                    chunk.rmc$tickUntil(until);
+                                    if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
+                                });
                             }
                         });
                     }
@@ -101,6 +113,9 @@ public abstract class TickManager {
                 }, ACTIVATION_EXECUTOR));
             });
             toComplete.forEach((future) -> PENDING_TILES.addAll(future.join()));
+        }
+        if (!chunksForTick.isEmpty()) {
+            PENDING_CHUNKS.addAll(chunksForTick);
         }
     }
 
