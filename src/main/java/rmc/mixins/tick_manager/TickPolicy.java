@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 public class TickPolicy {
 
     public static final TickPolicy PERCENT_100 = new TickPolicy(100, 1, false);
+    public static final TickPolicy PERCENT_75 = new TickPolicy(75, 4, true);
     public static final TickPolicy PERCENT_50 = new TickPolicy(50, 2, false);
 
     public boolean canTick(int shift) {

@@ -57,8 +57,8 @@ public abstract class TickManager {
                     poses.forEach((pos) -> {
                         ChunkEx chunk = getChunkEx(world, pos.asLong());
                         if (chunk != null) {
-                            chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
-                            chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
+                            chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_75);
+                            chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_75);
                             chunk.rmc$tickUntil(until);
                             if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
                         }
