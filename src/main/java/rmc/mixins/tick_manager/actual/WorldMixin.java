@@ -8,10 +8,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
+import com.mohistmc.api.mc.ChunkMcAPI;
+
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.server.ServerWorld;
 import rmc.mixins.tick_manager.TickManager;
 
@@ -56,10 +57,9 @@ public abstract class WorldMixin {
             Object hack = this;
             this.addedTileEntityList.forEach((tile) -> {
                 BlockPos pos = tile.getPos();
-                Chunk chunk = (Chunk) TickManager.getChunkEx((ServerWorld) hack, pos.getX() >> 4, pos.getZ() >> 4);
-                if (chunk != null) {
-                    chunk.addTileEntity(pos, tile);
-                }
+                ChunkMcAPI.getBorderChunkNow((ServerWorld) hack, pos.getX() >> 4, pos.getZ() >> 4).ifPresent((chunkMc) -> {
+                    chunkMc.addTileEntity(pos, tile);
+                });
             });
             this.addedTileEntityList.clear();
         }

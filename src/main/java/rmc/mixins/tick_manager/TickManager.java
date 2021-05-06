@@ -4,11 +4,13 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.electronwill.nightconfig.core.file.FileConfig;
+import com.mohistmc.api.mc.ChunkMcAPI;
 
 import codechicken.chunkloader.api.IChunkLoaderHandler;
 import codechicken.chunkloader.world.Organiser;
@@ -16,13 +18,10 @@ import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.ITickableTileEntity;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.server.ChunkHolder;
 import net.minecraft.world.server.ServerWorld;
 import rmc.mixins.tick_manager.extend.ChunkEx;
 import rmc.mixins.tick_manager.extend.ChunkLoaderHandlerEx;
-import rmc.mixins.tick_manager.extend.ServerChunkProviderEx;
 import rmc.mixins.tick_manager.extend.TileEntityEx;
 
 /**
@@ -55,13 +54,13 @@ public abstract class TickManager {
             organisers.forEach((organiser) -> {
                 organiser.forcedChunksByLoader.values().forEach((poses) -> {
                     poses.forEach((pos) -> {
-                        ChunkEx chunk = getChunkEx(world, pos.asLong());
-                        if (chunk != null) {
+                        ChunkMcAPI.getEntityTickingChunkNow(world, pos.x, pos.z).ifPresent((chunkMc) -> {
+                            ChunkEx chunk = (ChunkEx) chunkMc;
                             chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_75);
                             chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_75);
                             chunk.rmc$tickUntil(until);
                             if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
-                        }
+                        });
                     });
                 });
             });
@@ -71,10 +70,12 @@ public abstract class TickManager {
             players.forEach((player) -> {
                 for (int shiftX = -CHUNK_RADIUS; shiftX <= CHUNK_RADIUS; shiftX++) {
                     for (int shiftZ = -CHUNK_RADIUS; shiftZ <= CHUNK_RADIUS; shiftZ++) {
-                        ChunkEx chunk = getChunkEx(world, player.chunkCoordX + shiftX, player.chunkCoordZ + shiftZ);
-                        if (chunk != null) {
-                            int absShiftX = Math.abs(shiftX);
-                            int absShiftZ = Math.abs(shiftZ);
+                        final int finShiftX = shiftX;
+                        final int finShiftZ = shiftZ;
+                        ChunkMcAPI.getEntityTickingChunkNow(world, player.chunkCoordX + finShiftX, player.chunkCoordZ + finShiftZ).ifPresent((chunkMc) -> {
+                            ChunkEx chunk = (ChunkEx) chunkMc;
+                            int absShiftX = Math.abs(finShiftX);
+                            int absShiftZ = Math.abs(finShiftZ);
                             if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
                                 chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
                                 chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
@@ -87,7 +88,7 @@ public abstract class TickManager {
                                 chunk.rmc$tickUntil(until);
                                 if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
                             }
-                        }
+                        });
                     }
                 }
             });
@@ -104,19 +105,9 @@ public abstract class TickManager {
     }
 
     public static boolean canTick(ServerWorld world, BlockPos pos, Tickable tickable) {
-        ChunkEx chunk;
-        return (chunk = getChunkEx(world, pos.getX() >> 4, pos.getZ() >> 4)) != null
-            && chunk.rmc$canTick(tickable);
-    }
-
-    public static ChunkEx getChunkEx(ServerWorld world, int cX, int cZ) {
-        return getChunkEx(world, new ChunkPos(cX, cZ).asLong());
-    }
-
-    private static ChunkEx getChunkEx(ServerWorld world, long cPos) {
-        ChunkHolder holder = ((ServerChunkProviderEx) world.getChunkProvider()).rmc$getChunkHolder(cPos);
-        if (holder == null) return null;
-        return (ChunkEx) holder.getFullChunk();
+        Optional<Chunk> optChunkMc = ChunkMcAPI.getEntityTickingChunkNow(world, pos.getX() >> 4, pos.getZ() >> 4);
+        return optChunkMc.isPresent()
+            && ((ChunkEx) optChunkMc.get()).rmc$canTick(tickable);
     }
 
     private static List<ITickableTileEntity> handleTiles(Chunk chunk) {

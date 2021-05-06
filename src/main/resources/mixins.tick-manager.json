@@ -6,7 +6,6 @@
         "ActivationRangeMixin",
         "ChunkLoaderHandlerMixin",
         "ChunkMixin",
-        "ServerChunkProviderMixin",
         "ServerWorldMixin",
         "TileEntityMixin",
         "WorldMixin"
