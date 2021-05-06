@@ -118,6 +118,7 @@ dependencies {
     // that the dep is a ForgeGradle 'patcher' dependency. And it's patches will be applied.
     // The userdev artifact is a special name and will get all sorts of transformations applied to it.
     minecraft 'net.minecraftforge:forge:1.16.5-36.0.46'
+    compileOnly files('libs/chunkmcapi.jar')
     compileOnly files('libs/CS_ChickenChunks-1.16.4-2.7.0.85-universal.jar')
     compileOnly files('libs/forge-1.16.5-36.0.42.jar')
 
