@@ -60,14 +60,16 @@ public abstract class TickManager {
             organisers.forEach((organiser) -> {
                 organiser.forcedChunksByLoader.values().forEach((poses) -> {
                     poses.forEach((pos) -> {
-                        ChunkMcAPI.getBorderChunkNow(world, pos.x, pos.z).ifPresent((borderChunk) -> {
-                            if (!chunksForTick.contains(borderChunk)) chunksForTick.add(borderChunk);
-                            ChunkMcAPI.getEntityTickingChunkNow(world, pos.x, pos.z).ifPresent((fullChunk) -> {
-                                ChunkEx chunk = (ChunkEx) fullChunk;
-                                chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_75);
-                                chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_75);
-                                chunk.rmc$tickUntil(until);
-                                if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
+                        ChunkMcAPI.getChunkHolder(world, pos.asLong()).ifPresent((holder) -> {
+                            ChunkMcAPI.getBorderChunkNow(holder).ifPresent((border) -> {
+                                if (!chunksForTick.contains(border)) chunksForTick.add(border);
+                                ChunkMcAPI.getEntityTickingChunkNow(holder).ifPresent((entityTicking) -> {
+                                    if (!chunks.contains(entityTicking)) chunks.add(entityTicking);
+                                    ChunkEx ex = (ChunkEx) entityTicking;
+                                    ex.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_75);
+                                    ex.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_75);
+                                    ex.rmc$tickUntil(until);
+                                });
                             });
                         });
                     });
@@ -79,27 +81,27 @@ public abstract class TickManager {
             players.forEach((player) -> {
                 for (int shiftX = -CHUNK_TICK_RADIUS; shiftX <= CHUNK_TICK_RADIUS; shiftX++) {
                     for (int shiftZ = -CHUNK_TICK_RADIUS; shiftZ <= CHUNK_TICK_RADIUS; shiftZ++) {
-                        int finShiftX = shiftX;
-                        int finShiftZ = shiftZ;
                         int absShiftX = Math.abs(shiftX);
                         int absShiftZ = Math.abs(shiftZ);
-                        ChunkMcAPI.getBorderChunkNow(world, player.chunkCoordX + shiftX, player.chunkCoordZ + shiftZ).ifPresent((borderChunk) -> {
-                            if (!chunksForTick.contains(borderChunk)) chunksForTick.add(borderChunk);
-                            if (absShiftX <= CHUNK_RADIUS && absShiftZ <= CHUNK_RADIUS) {
-                                ChunkMcAPI.getEntityTickingChunkNow(world, player.chunkCoordX + finShiftX, player.chunkCoordZ + finShiftZ).ifPresent((fullChunk) -> {
-                                    ChunkEx chunk = (ChunkEx) fullChunk;
-                                    if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
-                                        chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
-                                        chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
-                                    }
-                                    else {
-                                        chunk.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_50);
-                                        chunk.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_50);
-                                    }
-                                    chunk.rmc$tickUntil(until);
-                                    if (!chunks.contains((Chunk) chunk)) chunks.add((Chunk) chunk);
-                                });
-                            }
+                        ChunkMcAPI.getChunkHolder(world, player.chunkCoordX + shiftX, player.chunkCoordZ + shiftZ).ifPresent((holder) -> {
+                            ChunkMcAPI.getBorderChunkNow(holder).ifPresent((border) -> {
+                                if (!chunksForTick.contains(border)) chunksForTick.add(border);
+                                if (absShiftX <= CHUNK_RADIUS && absShiftZ <= CHUNK_RADIUS) {
+                                    ChunkMcAPI.getEntityTickingChunkNow(holder).ifPresent((entityTicking) -> {
+                                        if (!chunks.contains(entityTicking)) chunks.add(entityTicking);
+                                        ChunkEx ex = (ChunkEx) entityTicking;
+                                        if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
+                                            ex.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_100);
+                                            ex.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_100);
+                                        }
+                                        else {
+                                            ex.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_50);
+                                            ex.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_50);
+                                        }
+                                        ex.rmc$tickUntil(until);
+                                    });
+                                }
+                            });
                         });
                     }
                 }
