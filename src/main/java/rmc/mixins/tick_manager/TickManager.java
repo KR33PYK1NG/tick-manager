@@ -3,7 +3,9 @@ package rmc.mixins.tick_manager;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -31,6 +33,7 @@ public abstract class TickManager {
 
     private static final int CHUNK_RADIUS;
     private static final int CHUNK_TICK_RADIUS;
+    private static final int CHUNK_SPAWN_RADIUS;
 
     static {
         File cfgfile = new File("mixincfg/tick-manager.toml");
@@ -38,38 +41,43 @@ public abstract class TickManager {
         FileConfig config = FileConfig.of(cfgfile);
         config.load();
         config.add("chunk-radius", 1);
-        config.add("chunk-tick-radius", 7);
+        config.add("chunk-tick-radius", 6);
+        config.add("chunk-spawn-radius", 3);
         CHUNK_RADIUS = config.getInt("chunk-radius");
         CHUNK_TICK_RADIUS = config.getInt("chunk-tick-radius");
+        CHUNK_SPAWN_RADIUS = config.getInt("chunk-spawn-radius");
         config.save();
         config.close();
     }
 
     private static final ExecutorService ACTIVATION_EXECUTOR = Executors.newFixedThreadPool(20);
     public static final List<ITickableTileEntity> PENDING_TILES = new ArrayList<>();
-    public static final List<Chunk> PENDING_CHUNKS = new ArrayList<>();
+    public static final Map<Chunk, PendingChunkInfo> PENDING_CHUNKS = new HashMap<>();
 
     public static void activateAll(ServerWorld world) {
         PENDING_TILES.clear();
         PENDING_CHUNKS.clear();
         int until = MinecraftServer.currentTick + 1;
         List<Chunk> chunks = new ArrayList<>();
-        List<Chunk> chunksForTick = new ArrayList<>();
+        Map<Chunk, PendingChunkInfo> chunksForTick = new HashMap<>();
         Collection<Organiser> organisers = ((ChunkLoaderHandlerEx) IChunkLoaderHandler.getCapability(world)).rmc$getPlayerOrganisers().values();
         if (!organisers.isEmpty()) {
             organisers.forEach((organiser) -> {
                 organiser.forcedChunksByLoader.values().forEach((poses) -> {
                     poses.forEach((pos) -> {
                         ChunkMcAPI.getChunkHolder(world, pos.asLong()).ifPresent((holder) -> {
-                            ChunkMcAPI.getBorderChunkNow(holder).ifPresent((border) -> {
-                                if (!chunksForTick.contains(border)) chunksForTick.add(border);
+                            ChunkMcAPI.getTickingChunkNow(holder).ifPresent((ticking) -> {
+                                PendingChunkInfo pci = new PendingChunkInfo();
+                                pci.spawnMobs = false;
                                 ChunkMcAPI.getEntityTickingChunkNow(holder).ifPresent((entityTicking) -> {
+                                    pci.isAlsoEntityTicking = true;
                                     if (!chunks.contains(entityTicking)) chunks.add(entityTicking);
                                     ChunkEx ex = (ChunkEx) entityTicking;
                                     ex.rmc$tickPolicy(until, Tickable.TILE, TickPolicy.PERCENT_75);
                                     ex.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_75);
                                     ex.rmc$tickUntil(until);
                                 });
+                                if (!chunksForTick.containsKey(ticking)) chunksForTick.put(ticking, pci);
                             });
                         });
                     });
@@ -84,10 +92,12 @@ public abstract class TickManager {
                         int absShiftX = Math.abs(shiftX);
                         int absShiftZ = Math.abs(shiftZ);
                         ChunkMcAPI.getChunkHolder(world, player.chunkCoordX + shiftX, player.chunkCoordZ + shiftZ).ifPresent((holder) -> {
-                            ChunkMcAPI.getBorderChunkNow(holder).ifPresent((border) -> {
-                                if (!chunksForTick.contains(border)) chunksForTick.add(border);
+                            ChunkMcAPI.getTickingChunkNow(holder).ifPresent((ticking) -> {
+                                PendingChunkInfo pci = new PendingChunkInfo();
+                                pci.spawnMobs = absShiftX <= CHUNK_SPAWN_RADIUS && absShiftZ <= CHUNK_SPAWN_RADIUS;
                                 if (absShiftX <= CHUNK_RADIUS && absShiftZ <= CHUNK_RADIUS) {
                                     ChunkMcAPI.getEntityTickingChunkNow(holder).ifPresent((entityTicking) -> {
+                                        pci.isAlsoEntityTicking = true;
                                         if (!chunks.contains(entityTicking)) chunks.add(entityTicking);
                                         ChunkEx ex = (ChunkEx) entityTicking;
                                         if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
@@ -101,6 +111,7 @@ public abstract class TickManager {
                                         ex.rmc$tickUntil(until);
                                     });
                                 }
+                                if (!chunksForTick.containsKey(ticking)) chunksForTick.put(ticking, pci);
                             });
                         });
                     }
@@ -117,7 +128,7 @@ public abstract class TickManager {
             toComplete.forEach((future) -> PENDING_TILES.addAll(future.join()));
         }
         if (!chunksForTick.isEmpty()) {
-            PENDING_CHUNKS.addAll(chunksForTick);
+            PENDING_CHUNKS.putAll(chunksForTick);
         }
     }
 
