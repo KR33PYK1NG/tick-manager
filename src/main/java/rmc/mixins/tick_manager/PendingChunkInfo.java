@@ -5,8 +5,8 @@ package rmc.mixins.tick_manager;
  */
 public class PendingChunkInfo {
 
-    boolean spawnMobs;
-    boolean isAlsoEntityTicking;
+    public boolean spawnMobs;
+    public boolean isAlsoEntityTicking;
 
     PendingChunkInfo() {}
 

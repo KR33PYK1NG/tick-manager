@@ -42,7 +42,7 @@ public abstract class TickManager {
         config.load();
         config.add("chunk-radius", 1);
         config.add("chunk-tick-radius", 6);
-        config.add("chunk-spawn-radius", 3);
+        config.add("chunk-spawn-radius", 6);
         CHUNK_RADIUS = config.getInt("chunk-radius");
         CHUNK_TICK_RADIUS = config.getInt("chunk-tick-radius");
         CHUNK_SPAWN_RADIUS = config.getInt("chunk-spawn-radius");
@@ -95,9 +95,9 @@ public abstract class TickManager {
                             ChunkMcAPI.getTickingChunkNow(holder).ifPresent((ticking) -> {
                                 PendingChunkInfo pci = new PendingChunkInfo();
                                 pci.spawnMobs = absShiftX <= CHUNK_SPAWN_RADIUS && absShiftZ <= CHUNK_SPAWN_RADIUS;
-                                if (absShiftX <= CHUNK_RADIUS && absShiftZ <= CHUNK_RADIUS) {
-                                    ChunkMcAPI.getEntityTickingChunkNow(holder).ifPresent((entityTicking) -> {
-                                        pci.isAlsoEntityTicking = true;
+                                ChunkMcAPI.getEntityTickingChunkNow(holder).ifPresent((entityTicking) -> {
+                                    pci.isAlsoEntityTicking = true;
+                                    if (absShiftX <= CHUNK_RADIUS && absShiftZ <= CHUNK_RADIUS) {
                                         if (!chunks.contains(entityTicking)) chunks.add(entityTicking);
                                         ChunkEx ex = (ChunkEx) entityTicking;
                                         if (absShiftX < CHUNK_RADIUS && absShiftZ < CHUNK_RADIUS) {
@@ -109,8 +109,8 @@ public abstract class TickManager {
                                             ex.rmc$tickPolicy(until, Tickable.ENTITY, TickPolicy.PERCENT_50);
                                         }
                                         ex.rmc$tickUntil(until);
-                                    });
-                                }
+                                    }
+                                });
                                 if (!chunksForTick.containsKey(ticking)) chunksForTick.put(ticking, pci);
                             });
                         });
