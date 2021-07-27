@@ -126,7 +126,7 @@ public abstract class TickManager {
                 }
                 if (!densityChunks.isEmpty()) {
                     WorldEntitySpawner.EntityDensityManager density = WorldEntitySpawner.func_234964_a_(densityChunks.size(), new ZoneIterable(densityChunks), (cPos, action) -> {
-                        action.accept(ChunkMcAPI.getEntityTickingChunkNow(world, cPos).get());
+                        ChunkMcAPI.getBorderChunkNow(world, cPos).ifPresent(action);
                     });
                     densityChunks.forEach(chunk -> {
                         if (!CHUNK_DENSITY.containsKey(chunk)) {
