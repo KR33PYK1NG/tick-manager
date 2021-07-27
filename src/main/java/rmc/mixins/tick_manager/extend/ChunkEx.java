@@ -12,4 +12,7 @@ public interface ChunkEx {
     public void    rmc$tickPolicy(int until, Tickable tickable, TickPolicy policy);
     public void    rmc$tickUntil (int until);
 
+    public int  rmc$getClosestPlayerY();
+    public void rmc$setClosestPlayerY(int y);
+
 }

@@ -39,15 +39,16 @@ public abstract class ServerChunkProviderMixin {
     private void tickChunks() {
         boolean doMobSpawning = this.world.getGameRules().getBoolean(GameRules.DO_MOB_SPAWNING);
         if (doMobSpawning) {
-            this.field_241097_p_ = WorldEntitySpawner.func_234964_a_(this.ticketManager.getSpawningChunksCount(), this.world.func_241136_z_(), this::func_241098_a_);
+            //this.field_241097_p_ = WorldEntitySpawner.func_234964_a_(this.ticketManager.getSpawningChunksCount(), this.world.func_241136_z_(), this::func_241098_a_);
         }
         TickManager.PENDING_CHUNKS.forEach((chunk, pci) -> {
             ChunkMcAPI.getChunkHolder(this.world, chunk.getPos().asLong()).ifPresent((holder) -> {
                 holder.sendChanges(chunk);
             });
             if (pci.isAlsoEntityTicking) {
-                if (doMobSpawning && pci.spawnMobs) {
-                    WorldEntitySpawner.func_234979_a_(this.world, chunk, this.field_241097_p_, this.spawnHostiles, this.spawnPassives, this.world.getWorldInfo().getGameTime() % 400 == 0);
+                WorldEntitySpawner.EntityDensityManager density;
+                if (doMobSpawning && pci.spawnMobs && (density = TickManager.CHUNK_DENSITY.get(chunk)) != null) {
+                    WorldEntitySpawner.func_234979_a_(this.world, chunk, density, this.spawnHostiles, this.spawnPassives, this.spawnPassives);
                 }
                 this.world.tickEnvironment(chunk, this.world.getGameRules().getInt(GameRules.RANDOM_TICK_SPEED));
             }

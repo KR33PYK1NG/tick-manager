@@ -22,6 +22,7 @@ import net.minecraft.tileentity.ITickableTileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.server.ServerWorld;
+import net.minecraft.world.spawner.WorldEntitySpawner;
 import rmc.mixins.tick_manager.extend.ChunkEx;
 import rmc.mixins.tick_manager.extend.ChunkLoaderHandlerEx;
 import rmc.mixins.tick_manager.extend.TileEntityEx;
@@ -31,6 +32,7 @@ import rmc.mixins.tick_manager.extend.TileEntityEx;
  */
 public abstract class TickManager {
 
+    public static final int ENTITY_SPAWN_BOUNDS;
     private static final int CHUNK_RADIUS;
     private static final int CHUNK_TICK_RADIUS;
     private static final int CHUNK_SPAWN_RADIUS;
@@ -40,9 +42,11 @@ public abstract class TickManager {
         cfgfile.getParentFile().mkdir();
         FileConfig config = FileConfig.of(cfgfile);
         config.load();
+        config.add("entity-spawn-bounds", 16);
         config.add("chunk-radius", 1);
         config.add("chunk-tick-radius", 6);
         config.add("chunk-spawn-radius", 6);
+        ENTITY_SPAWN_BOUNDS = config.getInt("entity-spawn-bounds");
         CHUNK_RADIUS = config.getInt("chunk-radius");
         CHUNK_TICK_RADIUS = config.getInt("chunk-tick-radius");
         CHUNK_SPAWN_RADIUS = config.getInt("chunk-spawn-radius");
@@ -53,10 +57,12 @@ public abstract class TickManager {
     private static final ExecutorService ACTIVATION_EXECUTOR = Executors.newFixedThreadPool(20);
     public static final List<ITickableTileEntity> PENDING_TILES = new ArrayList<>();
     public static final Map<Chunk, PendingChunkInfo> PENDING_CHUNKS = new HashMap<>();
+    public static final Map<Chunk, WorldEntitySpawner.EntityDensityManager> CHUNK_DENSITY = new HashMap<>();
 
     public static void activateAll(ServerWorld world) {
         PENDING_TILES.clear();
         PENDING_CHUNKS.clear();
+        CHUNK_DENSITY.clear();
         int until = MinecraftServer.currentTick + 1;
         List<Chunk> chunks = new ArrayList<>();
         Map<Chunk, PendingChunkInfo> chunksForTick = new HashMap<>();
@@ -87,6 +93,7 @@ public abstract class TickManager {
         List<ServerPlayerEntity> players = world.getPlayers();
         if (!players.isEmpty()) {
             players.forEach((player) -> {
+                List<Chunk> densityChunks = new ArrayList<>();
                 for (int shiftX = -CHUNK_TICK_RADIUS; shiftX <= CHUNK_TICK_RADIUS; shiftX++) {
                     for (int shiftZ = -CHUNK_TICK_RADIUS; shiftZ <= CHUNK_TICK_RADIUS; shiftZ++) {
                         int absShiftX = Math.abs(shiftX);
@@ -97,6 +104,7 @@ public abstract class TickManager {
                                 pci.spawnMobs = absShiftX <= CHUNK_SPAWN_RADIUS && absShiftZ <= CHUNK_SPAWN_RADIUS;
                                 ChunkMcAPI.getEntityTickingChunkNow(holder).ifPresent((entityTicking) -> {
                                     pci.isAlsoEntityTicking = true;
+                                    if (pci.spawnMobs) densityChunks.add(entityTicking);
                                     if (absShiftX <= CHUNK_RADIUS && absShiftZ <= CHUNK_RADIUS) {
                                         if (!chunks.contains(entityTicking)) chunks.add(entityTicking);
                                         ChunkEx ex = (ChunkEx) entityTicking;
@@ -115,6 +123,17 @@ public abstract class TickManager {
                             });
                         });
                     }
+                }
+                if (!densityChunks.isEmpty()) {
+                    WorldEntitySpawner.EntityDensityManager density = WorldEntitySpawner.func_234964_a_(densityChunks.size(), new ZoneIterable(densityChunks), (cPos, action) -> {
+                        action.accept(ChunkMcAPI.getEntityTickingChunkNow(world, cPos).get());
+                    });
+                    densityChunks.forEach(chunk -> {
+                        if (!CHUNK_DENSITY.containsKey(chunk)) {
+                            ((ChunkEx) chunk).rmc$setClosestPlayerY((int) player.getPosY());
+                            CHUNK_DENSITY.put(chunk, density);
+                        }
+                    });
                 }
             });
         }

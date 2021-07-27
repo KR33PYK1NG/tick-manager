@@ -21,6 +21,7 @@ implements ChunkEx {
     private final int rmc$shift = rmc$SHIFT_RANDOM.nextInt(100000);
     private final TickPolicy[] rmc$policies = new TickPolicy[Tickable.values().length];
     private int rmc$until = Integer.MIN_VALUE;
+    private int rmc$closestPlayerY = -1;
 
     @Override
     public boolean rmc$canTick(Tickable tickable) {
@@ -43,6 +44,16 @@ implements ChunkEx {
     @Override
     public void rmc$tickUntil(int until) {
         this.rmc$until = until;
+    }
+
+    @Override
+    public int rmc$getClosestPlayerY() {
+        return this.rmc$closestPlayerY;
+    }
+
+    @Override
+    public void rmc$setClosestPlayerY(int y) {
+        this.rmc$closestPlayerY = y;
     }
 
 }
