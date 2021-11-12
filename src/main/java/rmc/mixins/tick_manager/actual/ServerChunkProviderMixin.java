@@ -17,6 +17,9 @@ import net.minecraft.world.server.ServerWorld;
 import net.minecraft.world.server.TicketManager;
 import net.minecraft.world.spawner.WorldEntitySpawner;
 import net.minecraft.world.spawner.WorldEntitySpawner.EntityDensityManager;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import rmc.mixins.tick_manager.TickManager;
 import rmc.mixins.tick_manager.extend.ChunkManagerEx;
 
@@ -35,8 +38,10 @@ public abstract class ServerChunkProviderMixin {
 
     @Shadow private void func_241098_a_(long p_241098_1_, Consumer<Chunk> p_241098_3_) {}
 
-    @Overwrite
-    private void tickChunks() {
+    @Inject(method = "Lnet/minecraft/world/server/ServerChunkProvider;tickChunks()V",
+            cancellable = true,
+            at = @At(value = "HEAD"))
+    private void tickChunks(CallbackInfo mixin) {
         boolean doMobSpawning = this.world.getGameRules().getBoolean(GameRules.DO_MOB_SPAWNING);
         if (doMobSpawning) {
             //this.field_241097_p_ = WorldEntitySpawner.func_234964_a_(this.ticketManager.getSpawningChunksCount(), this.world.func_241136_z_(), this::func_241098_a_);
@@ -57,6 +62,7 @@ public abstract class ServerChunkProviderMixin {
             this.world.func_241123_a_(this.spawnHostiles, this.spawnPassives);
         }
         ((ChunkManagerEx) this.chunkManager).rmc$tickEntityTracker();
+        mixin.cancel();
     }
 
 }
