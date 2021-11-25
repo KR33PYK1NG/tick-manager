@@ -30,6 +30,8 @@ public class ZoneIterator implements Iterator<Entity> {
             slice = chunk.getEntityLists()[this.sPos];
         }
         this.prepared = ((ClassInheritanceMultiMapEx) slice).rmc$getEntity(this.ePos);
+        if (!this.prepared.isAlive())
+            return this.hasNext();
         return true;
     }
 
@@ -43,7 +45,7 @@ public class ZoneIterator implements Iterator<Entity> {
     private int cPos, sPos, ePos;
     private final List<Chunk> chunks;
 
-    ZoneIterator(List<Chunk> chunks) {
+    ZoneIterator(final List<Chunk> chunks) {
         this.chunks = chunks;
     }
 
