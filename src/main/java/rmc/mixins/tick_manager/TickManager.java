@@ -1,7 +1,12 @@
 package rmc.mixins.tick_manager;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -11,15 +16,12 @@ import com.mohistmc.api.mc.ChunkMcAPI;
 
 import codechicken.chunkloader.api.IChunkLoaderHandler;
 import codechicken.chunkloader.world.Organiser;
-import com.mohistmc.configuration.MohistConfigUtil;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.ITickableTileEntity;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.server.TicketType;
 import net.minecraft.world.spawner.WorldEntitySpawner;
 import rmc.mixins.tick_manager.extend.ChunkEx;
 import rmc.mixins.tick_manager.extend.ChunkLoaderHandlerEx;
@@ -29,8 +31,6 @@ import rmc.mixins.tick_manager.extend.TileEntityEx;
  * Developed by RMC Team, 2021
  */
 public abstract class TickManager {
-
-    public static final TicketType<ChunkPos> UNLOAD_DELAY = TicketType.create("unload_delay", Comparator.comparingLong(ChunkPos::asLong), 5 * 20); // Mohist - Introduce 'chunk_unload_delay' option
 
     public static final int ENTITY_SPAWN_BOUNDS;
     private static final int CHUNK_RADIUS;

@@ -1,19 +1,17 @@
 {
-  "minVersion": "0.8",
-  "refmap": "mixins.tick-manager.refmap.json",
-  "package": "rmc.mixins.tick_manager.actual",
-  "mixins": [
-    "ActivationRangeMixin",
-    "ChunkLoaderHandlerMixin",
-    "ChunkManagerMixin",
-    "ChunkMixin",
-    "ClassInheritanceMultiMapMixin",
-    "ServerChunkProviderMixin",
-    "ServerWorldMixin",
-    "TicketManagerMixin",
-    "TicketMixin",
-    "TileEntityMixin",
-    "WorldEntitySpawnerMixin",
-    "WorldMixin"
-  ]
+    "minVersion": "0.8",
+    "refmap": "mixins.tick-manager.refmap.json",
+    "package": "rmc.mixins.tick_manager.actual",
+    "mixins": [
+        "ActivationRangeMixin",
+        "ChunkLoaderHandlerMixin",
+        "ChunkManagerMixin",
+        "ChunkMixin",
+        "ClassInheritanceMultiMapMixin",
+        "ServerChunkProviderMixin",
+        "ServerWorldMixin",
+        "TileEntityMixin",
+        "WorldEntitySpawnerMixin",
+        "WorldMixin"
+    ]
 }
